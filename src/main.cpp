@@ -693,7 +693,7 @@ void loop()
         lastFrameStart = 0;
         frameId++;
       }
-      if ( !(pause && movie[frameId].recorded) )
+      if ( !(pause && !movie[frameId].recorded) )
         pause = !pause;
       lcdUpdate();
     } else { // Record positions

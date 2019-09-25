@@ -1,3 +1,3 @@
 [submodule "lib/SCServo"]
 	path = lib/SCServo
-	url = https://github.com/is2511/SCServo
+	url = https://github.com/IS2511/SCServo

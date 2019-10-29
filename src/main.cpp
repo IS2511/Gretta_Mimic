@@ -38,9 +38,9 @@
 #define IR_HOLD_RECV_COUNT 7
 #define IR_CLEAR_TIME 200
 
-#define SERVO_COUNT 15
-#define READ_RETRY_COUNT 3
-#define SERVO_MAX_LOAD 100
+#define SCS_COUNT 15
+#define SCS_READ_RETRY_COUNT 3
+#define SCS_MAX_LOAD 100
 
 #define LCD_ON true
 #define DISPLAY_ON true // Display refers to OLED display
@@ -135,7 +135,7 @@ char loadingChar[4] = {'|', '/', '-', '\0'};
 
 // The movie and servos part
 typedef struct {
-  u16 position[SERVO_COUNT]; // Positions of all servos
+  u16 position[SCS_COUNT]; // Positions of all servos
   word time = 1000;          // Time to complete the move (in ms)
   bool recorded = false;     // There is no easy way to check this, so storing
 } frame;
@@ -145,19 +145,19 @@ byte frameId = 0;
 bool modePlay = false; // false - record, true - play
 bool movieLoop = false;
 bool pause = true;
-byte ID[SERVO_COUNT] = { // Servos IDs, predefined by design
+byte ID[SCS_COUNT] = { // Servos IDs, predefined by design
   1, 2, 3, 11, 12, 13, 14, 15, 16, 21, 22, 23, 24, 25, 26
 };
 // IDs structure:
 // 1, 2, 3 - 3 neck axis
 // 1x - right hand top to bottom (1-6)
 // 2x - left hand top to bottom (1-6)
-bool isSC[SERVO_COUNT] = { // Different connection protocols (SCSCL and SMSCL)
+bool isSC[SCS_COUNT] = { // Different connection protocols (SCSCL and SMSCL)
   true, true, true,
   false, false, false, false, true, true,
   false, false, false, false, true, true
 };
-bool isOnline[SERVO_COUNT] = {
+bool isOnline[SCS_COUNT] = {
   true, true, true, true, true, true, true, true, true, true, true, true, true, true, true
 }; // All true for debug
 
@@ -421,12 +421,12 @@ int ReadPos(byte i) {
 }
 
 void SyncWritePos2() { // Name taken from the library
-  // sc.SyncWritePos2(ID, byte(SERVO_COUNT), movie[frameId].position, word(movie[frameId].time), word(0));
+  // sc.SyncWritePos2(ID, byte(SCS_COUNT), movie[frameId].position, word(movie[frameId].time), word(0));
   // delay(10);
-  // sm.SyncWritePos2(ID, byte(SERVO_COUNT), movie[frameId].position, word(movie[frameId].time), word(0));
+  // sm.SyncWritePos2(ID, byte(SCS_COUNT), movie[frameId].position, word(movie[frameId].time), word(0));
 
   // Function in library is not working properly... Replacing!
-  for (byte i = 0; i < SERVO_COUNT; i++) {
+  for (byte i = 0; i < SCS_COUNT; i++) {
     if (!isOnline[i]) continue;
     delay(1);
     if (!isSC[i])
@@ -448,6 +448,7 @@ void SyncWritePos2() { // Name taken from the library
 void handleIR();
 void handleMotors();
 void lcdUpdate();
+void checkTorque();
 
 void setup()
 {
@@ -557,28 +558,28 @@ void checkOnline() {
   lcd.clear();
   bool allOnline = true;
   String blank = "";
-  for (byte i = 0; i < SERVO_COUNT; i++) blank += "X";
+  for (byte i = 0; i < SCS_COUNT; i++) blank += "X";
   lcd.print(blank);
   // delete &blank; // Optimization?
   lcd.setCursor(0, 1);
   lcd.print("^");
-  for (byte i = 0; i < SERVO_COUNT; i++) {
+  for (byte i = 0; i < SCS_COUNT; i++) {
     if (i != 0) {
       lcd.setCursor(i-1, 1);
       lcd.print(" ^");
     }
-    for (byte retry = 0; retry < READ_RETRY_COUNT; retry++) {
+    for (byte retry = 0; retry < SCS_READ_RETRY_COUNT; retry++) {
       lcd.setCursor(15, 1);
       // lcd.print(loadingChar[(retry+i)%4]); // Maybe...?
       isOnline[i] = false;
       // delay(10); // Safety delay, not needed
-      if (Ping(i) && retry != READ_RETRY_COUNT-1) {
+      if (Ping(i) && retry != SCS_READ_RETRY_COUNT-1) {
         lcd.setCursor(i, 0);
         lcd.print("O");
         isOnline[i] = true;
         break;
       }
-      if (retry == READ_RETRY_COUNT-1) allOnline = false;
+      if (retry == SCS_READ_RETRY_COUNT-1) allOnline = false;
       if (stopEverything) return;
     }
 
@@ -609,30 +610,30 @@ void recordPositions() {
   bool recorded = true;
   int pos = 0;
   String blank = "";
-  for (byte i = 0; i < SERVO_COUNT; i++) blank += "X";
+  for (byte i = 0; i < SCS_COUNT; i++) blank += "X";
   lcd.print(blank);
   // delete &blank; // Optimization?
   lcd.setCursor(0, 1);
   lcd.print("^");
-  for (byte i = 0; i < SERVO_COUNT; i++) {
+  for (byte i = 0; i < SCS_COUNT; i++) {
     if (!isOnline[i]) continue;
     if (i != 0) {
       lcd.setCursor(i-1, 1);
       lcd.print(" ^");
     }
-    for (byte retry = 0; retry < READ_RETRY_COUNT; retry++) {
+    for (byte retry = 0; retry < SCS_READ_RETRY_COUNT; retry++) {
       delay(10);
       // lcd.setCursor(15, 1);
       // lcd.print(loadingChar[(millis()/300)%4]);
       animateLoading(1, 15); // Replacing ^
       pos = ReadPos(i);
-      if (pos != -1 && retry != READ_RETRY_COUNT-1) {
+      if (pos != -1 && retry != SCS_READ_RETRY_COUNT-1) {
         lcd.setCursor(i, 0);
         lcd.print("O");
         movie[frameId].position[i] = pos;
         break;
       }
-      if (retry == READ_RETRY_COUNT-1) recorded = false;
+      if (retry == SCS_READ_RETRY_COUNT-1) recorded = false;
       if (stopEverything) return;
     }
 
@@ -658,7 +659,10 @@ void recordPositions() {
 
 }
 
-unsigned int smallTimer = 0;
+
+
+
+
 
 void loop()
 {
@@ -719,7 +723,7 @@ void loop()
     for (byte i = 0; i < 60; i++) {
       // movie[i].start = 0;
       movie[i].time = 1000;
-      for (byte j = 0; j < SERVO_COUNT; j++) movie[i].position[j] = 0;
+      for (byte j = 0; j < SCS_COUNT; j++) movie[i].position[j] = 0;
     }
     delay(600);
     lcdBusy = false;
@@ -727,7 +731,7 @@ void loop()
   }
 
   if (button[charToID('2')] == HOLD) { // Turn all torque off
-    for (byte i = 0; i < SERVO_COUNT; i++) {
+    for (byte i = 0; i < SCS_COUNT; i++) {
       if (isSC[i])
         sc.EnableTorque(ID[i], 0);
       else
@@ -763,6 +767,7 @@ void loop()
 
   // The main motors control
   if (!pause) handleMotors();
+  // checkTorque();
 
   // Frame time borders
   if (movie[frameId].time == 65336 || movie[frameId].time == 65136 || movie[frameId].time == 64936) {
@@ -802,15 +807,15 @@ void loop()
 // Not used anywhere
 void checkTorque() {
 
-  for (byte i = 0; i < SERVO_COUNT; i++) {
-    for (byte retry = 0; retry < READ_RETRY_COUNT; retry++) {
+  for (byte i = 0; i < SCS_COUNT; i++) {
+    for (byte retry = 0; retry < SCS_READ_RETRY_COUNT; retry++) {
       word load = 0;
       if (isSC[i]) {
         load = sc.ReadLoad(ID[i]);
-        if (load > SERVO_MAX_LOAD) sc.EnableTorque(ID[i], 0);
+        if (load > SCS_MAX_LOAD) sc.EnableTorque(ID[i], 0);
       } else {
         load = sm.ReadLoad(ID[i]);
-        if (load > SERVO_MAX_LOAD) sm.EnableTorque(ID[i], 0);
+        if (load > SCS_MAX_LOAD) sm.EnableTorque(ID[i], 0);
       }
 
     }
@@ -879,7 +884,7 @@ void handleMotors() {
         Serial.print(F("Info: t"));
         Serial.print(movie[frameId].time, DEC);
         Serial.print(F(" Pos:"));
-        for (byte i = 0; i < SERVO_COUNT; i++) {
+        for (byte i = 0; i < SCS_COUNT; i++) {
           Serial.print(F(" "));
           Serial.print(pad(movie[frameId].position[i], 2, false));
         }
